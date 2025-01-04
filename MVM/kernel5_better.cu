@@ -4,53 +4,37 @@
 
 using namespace std;
 
-
 #define TILE 1024
-#define M 10000
+#define K 10000
 
-__global__ void kernel(float *A, float *B, float *C, const int m, const int k, const int n)
+__global__ void kernel(float *A, float *B, float *C, const int m, const int k)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int tx = threadIdx.x;
 
+    __shared__ float B_tile[K];
 
-    if (blockIdx.x == 0)
+    for (int i = tx; i < K; i += TILE)
     {
-        for (int i = tx; i < m; i += TILE)
+        B_tile[tx] = B[i];
+    }
+
+    __syncthreads();
+
+    float value = 0.0f;
+    for (int i = 0; i < K; i++)
+    {
+        if (x < m)
         {
-            C[i] = 0.0f;
+            value += A[x * K + i] * B[i];
         }
     }
 
-    __syncthreads();
-
-    __shared__ float C_partial[M];
-
-    for (int i = tx; i < m; i += TILE)
+    if (x < m)
     {
-        C_partial[i] = 0.0f;
+        C[x] = value;
     }
-
-    __syncthreads();
-
-    float B_value = B[x];
-    for (int i = 0; i < m; ++i)
-    {
-        if (x < k)
-        {   
-            atomicAdd(&C_partial[i], A[i * k + x] * B_value);
-        }
-    }
-    
-    __syncthreads();
-
-    for (int i = tx; i < m; i += TILE)
-    {
-        atomicAdd(&C[i], C_partial[i]);
-    }
-
 }
-
 
 int main(int argc, char **argv) {
   int m = 10000;
@@ -67,11 +51,11 @@ int main(int argc, char **argv) {
   float *h_C = (float *)malloc(C_size);
 
   for (int i = 0; i < m * k; i++) {
-    h_A[i] = static_cast<float>(rand()) / RAND_MAX;
+    h_A[i] = (i * 111) % 33;
   }
 
   for (int i = 0; i < k * n; i++) {
-    h_B[i] = static_cast<float>(rand()) / RAND_MAX;
+    h_B[i] = (i * 121) % 99;
   }
 
 
@@ -97,9 +81,9 @@ int main(int argc, char **argv) {
 
 
   dim3 blockDim(TILE);
-  int numBlocks = (m + TILE - 1) / TILE;
-  dim3 gridDim(numBlocks);
-  kernel<<<gridDim, blockDim>>>(d_A, d_B, d_C, m, k, n);
+  int tmp = (m + TILE - 1) / TILE;
+  dim3 gridDim(tmp);
+  kernel<<<gridDim, blockDim>>>(d_A, d_B, d_C, m, k);
 
   // Record the stop event
   cudaEventRecord(stop);
@@ -136,7 +120,7 @@ int main(int argc, char **argv) {
   for (int i = 0; i < m*n; i++)
   {
       float err = fabs(gold[i] - h_C[i]);
-      if (err > 0.1)
+      if (err > 0.01)
       {
         cout << err << endl;
       }

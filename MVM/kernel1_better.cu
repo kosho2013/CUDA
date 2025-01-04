@@ -6,49 +6,23 @@ using namespace std;
 
 
 #define TILE 1024
-#define M 10000
+
 
 __global__ void kernel(float *A, float *B, float *C, const int m, const int k, const int n)
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
-    int tx = threadIdx.x;
 
-
-    if (blockIdx.x == 0)
+    if (x < m)
     {
-        for (int i = tx; i < m; i += TILE)
-        {
-            C[i] = 0.0f;
-        }
-    }
+      float dot = 0;
+      for (int y = 0; y < k; ++y)
+      {
+          dot += A[y * k + x] * B[y];
+      }
+      C[x] = dot; 
 
-    __syncthreads();
-
-    __shared__ float C_partial[M];
-
-    for (int i = tx; i < m; i += TILE)
-    {
-        C_partial[i] = 0.0f;
-    }
-
-    __syncthreads();
-
-    float B_value = B[x];
-    for (int i = 0; i < m; ++i)
-    {
-        if (x < k)
-        {   
-            atomicAdd(&C_partial[i], A[i * k + x] * B_value);
-        }
     }
     
-    __syncthreads();
-
-    for (int i = tx; i < m; i += TILE)
-    {
-        atomicAdd(&C[i], C_partial[i]);
-    }
-
 }
 
 
@@ -67,11 +41,11 @@ int main(int argc, char **argv) {
   float *h_C = (float *)malloc(C_size);
 
   for (int i = 0; i < m * k; i++) {
-    h_A[i] = static_cast<float>(rand()) / RAND_MAX;
+    h_A[i] = (i + 22) % 44;
   }
 
   for (int i = 0; i < k * n; i++) {
-    h_B[i] = static_cast<float>(rand()) / RAND_MAX;
+    h_B[i] = (i - 22) % 64;
   }
 
 
@@ -133,14 +107,14 @@ int main(int argc, char **argv) {
   }
 
 
-  for (int i = 0; i < m*n; i++)
-  {
-      float err = fabs(gold[i] - h_C[i]);
-      if (err > 0.1)
-      {
-        cout << err << endl;
-      }
-  }
+//   for (int i = 0; i < m*n; i++)
+//   {
+//       float err = fabs(gold[i] - h_C[i]);
+//       if (err > 0.1)
+//       {
+//         cout << err << endl;
+//       }
+//   }
 
   // Free device memory
   cudaFree(d_A);

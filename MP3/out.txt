@@ -1,3 +1,0 @@
-blockDim: (32, 32, 1)
-gridDim: (7, 4, 1)
-Elapsed time: 0.274112 ms
