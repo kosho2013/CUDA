@@ -7,7 +7,7 @@
 
 using namespace std;
 
-#define TILE_SIZE 1024
+#define TILE 1024
 #define NUM_INPUT 20000
 #define NUM_BIN 256
 
@@ -89,9 +89,8 @@ int main(int argc, char **argv) {
 
 
   // Launch the kernel
-  dim3 blockDim(TILE_SIZE);
-  int tmp = (NUM_INPUT + TILE_SIZE - 1) / TILE_SIZE;
-  dim3 gridDim(tmp);
+  dim3 blockDim(TILE);
+  dim3 gridDim((NUM_INPUT + TILE - 1) / TILE);
   kernel<<<gridDim, blockDim>>>(d_in, d_out);
 
 
